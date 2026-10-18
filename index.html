@@ -161,6 +161,48 @@ function exportJSON(){download('backup-climatizar.json',JSON.stringify({version:
 function exportCSV(){const rows=[['Data','Tipo','Descrição','Conta','Conta destino','Categoria','Valor','Situação'],...db.transactions.map(t=>[t.date,t.type,t.description,t.account,t.toAccount||'',t.category||'',t.amount,t.status])];download('lancamentos-climatizar.csv','\ufeff'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n'),'text/csv;charset=utf-8')}
 document.getElementById('importFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const x=JSON.parse(await f.text());const incoming=x.data||x;if(!incoming||!Array.isArray(incoming.transactions)||!Array.isArray(incoming.services))throw Error('Formato inválido');if(!confirm('Restaurar o backup e substituir os dados atuais?'))return;db={services:[],transactions:[],stock:[],stockMoves:[],quotes:[],...incoming};save();initSelects();render();toast('Backup restaurado.')}catch(err){toast('Não foi possível restaurar esse arquivo JSON.')}e.target.value=''});
 function clearData(){if(!confirm('Isso apagará os dados deste novo aplicativo neste navegador. Continuar?'))return;if(!confirm('Confirma apagar todos os serviços, lançamentos, estoque e orçamentos?'))return;db={services:[],transactions:[],stock:[],stockMoves:[],quotes:[]};save();render();toast('Dados apagados.')}
+function del(collection, id) {
+  const allowed = ['services', 'transactions', 'stock', 'quotes'];
+
+  if (!allowed.includes(collection)) {
+    toast('Não foi possível identificar o registro.');
+    return;
+  }
+
+  const item = db[collection].find(x => x.id === id);
+
+  if (!item) {
+    toast('Registro não encontrado.');
+    return;
+  }
+
+  if (!confirm('Tem certeza de que deseja excluir este registro? Esta ação não pode ser desfeita.')) {
+    return;
+  }
+
+  if (collection === 'services') {
+    const marker = 'Criado a partir do agendamento ' + id;
+
+    db.transactions = db.transactions.filter(
+      t => !(t.notes || '').includes(marker)
+    );
+  }
+
+  if (collection === 'stock') {
+    db.stockMoves = db.stockMoves.filter(
+      m => m.item !== id
+    );
+  }
+
+  db[collection] = db[collection].filter(
+    x => x.id !== id
+  );
+
+  save();
+  render();
+  toast('Registro excluído com sucesso.');
+}
+
 load();initSelects();render();if(quoteDraftItems.length===0)addQuoteItem();updateQuoteTotal();
 </script>
 </body></html>
